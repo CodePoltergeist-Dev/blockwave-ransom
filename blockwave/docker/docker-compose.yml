@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: blockwave-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-logs:/var/log/blockwave
+      - quarantine-data:/data/quarantine
+      - config-data:/data/config
+    networks:
+      - blockwave-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    environment:
+      - LOG_LEVEL=INFO
+      - MAX_QUARANTINE_SIZE=5GB
+      - CONFIG_DIR=/data/config
+      - QUARANTINE_DIR=/data/quarantine
+      - LOG_DIR=/var/log/blockwave
+
+  ebpf-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ebpf
+    container_name: blockwave-ebpf
+    restart: unless-stopped
+    privileged: true  # Required for eBPF access
+    ports:
+      - "8001:8001"
+    volumes:
+      - ebpf-logs:/var/log/blockwave
+      - ebpf-data:/data/ebpf
+      - /sys/kernel/debug:/sys/kernel/debug:ro
+      - /lib/modules:/lib/modules:ro
+      - /usr/src:/usr/src:ro
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+    networks:
+      - blockwave-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    environment:
+      - LOG_LEVEL=INFO
+      - EBPF_DATA_DIR=/data/ebpf
+      - LOG_DIR=/var/log/blockwave
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  gui:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gui
+    container_name: blockwave-gui
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - config-data:/data/config
+    networks:
+      - blockwave-network
+    environment:
+      - NODE_ENV=production
+      - CONFIG_DIR=/data/config
+      - BACKEND_URL=http://backend:8000
+      - BACKEND_WS_URL=ws://backend:8000/events/stream
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  blockwave-network:
+    driver: bridge
+
+volumes:
+  backend-logs:
+    driver: local
+  ebpf-logs:
+    driver: local
+  ebpf-data:
+    driver: local
+  quarantine-data:
+    driver: local
+  config-data:
+    driver: local 

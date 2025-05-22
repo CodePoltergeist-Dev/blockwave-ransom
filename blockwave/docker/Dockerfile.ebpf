@@ -1,0 +1,51 @@
+FROM ubuntu:22.04
+
+WORKDIR /app
+
+# Install system dependencies for eBPF development
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    clang \
+    llvm \
+    libelf-dev \
+    linux-headers-generic \
+    bpfcc-tools \
+    libbpf-dev \
+    python3 \
+    python3-pip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Copy BlockWave-Ransom eBPF monitoring code
+COPY ebpf_monitor.py fs_monitor.py detection_orchestrator.py yara_scanner.py ml_classifier.py mitigator.py backup_restore.py logger.py proc_inspector.py ./
+COPY rules/ ./rules/
+COPY config/ ./config/
+COPY models/ ./models/
+
+# Create necessary directories
+RUN mkdir -p /var/log/blockwave /data/ebpf
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    LOG_DIR=/var/log/blockwave \
+    EBPF_DATA_DIR=/data/ebpf
+
+# Expose the service port
+EXPOSE 8001
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+# Set entrypoint
+ENTRYPOINT ["python3", "ebpf_monitor.py"]
+
+# Default command
+CMD ["--host", "0.0.0.0", "--port", "8001", "--config", "config/ebpf_config.yaml"]
+
+# Label to indicate this container needs special privileges
+LABEL io.blockwave.requires-privileges="true" 

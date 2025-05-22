@@ -1,0 +1,137 @@
+# Filesystem Monitor Configuration
+fs_monitor:
+  # Directories to watch for file events
+  watch_dirs:
+    - "/home/user/documents"
+    - "/home/user/downloads"
+    - "/var/www/html"
+  
+  # File patterns to ignore (glob syntax)
+  ignore_patterns:
+    - "*.tmp"
+    - "*.swp"
+    - ".git/*"
+    - "node_modules/*"
+  
+  # Event batching configuration
+  batch:
+    interval_ms: 500  # Batch events every 500 ms
+    max_events: 100   # Maximum events per batch
+  
+  # Performance settings
+  performance:
+    threads: 2        # Number of watcher threads
+    queue_size: 1000  # Maximum queue size
+  
+  # Logging settings
+  logging:
+    level: "INFO"     # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    file: "/var/log/blockwave/fs_monitor.log"
+
+# eBPF Monitor Configuration
+ebpf_monitor:
+  enabled: true
+  queue_size: 1000
+  ebpfangel:
+    thresholds:
+      open: 50
+      create: 25
+      delete: 25
+      encrypt: 10
+    reset_period_sec: 10
+    min_severity: 1
+  logging:
+    level: "INFO"
+    file: "/var/log/blockwave/ebpf_monitor.log"
+
+# YARA Scanner Configuration
+yara_scanner:
+  scan_timeout_sec: 30
+  process_scan_interval_sec: 300
+  max_file_size_mb: 100
+  concurrent_scans: 4
+  rules_dir: "rules"
+  scan_extensions:
+    - ".exe"
+    - ".dll"
+    - ".bat"
+    - ".ps1"
+    - ".vbs"
+    - ".js"
+    - ".doc"
+    - ".docx"
+    - ".xls"
+    - ".xlsx"
+    - ".pdf"
+  logging:
+    level: "INFO"
+    file: "/var/log/blockwave/yara_scanner.log"
+
+# Machine Learning Classifier Configuration
+ml_classifier:
+  model_path: "models/malwareclassifier-V2.pkl"
+  thresholds:
+    suspicious: 0.5      # Score threshold for suspicious classification
+    likely_malware: 0.7  # Score threshold for likely malware classification
+    malware: 0.9         # Score threshold for confirmed malware classification
+  feature_extraction:
+    use_file_metadata: true
+    use_process_behavior: true
+    use_network_activity: false
+  logging:
+    level: "INFO"
+    file: "/var/log/blockwave/ml_classifier.log"
+
+# Orchestrator Configuration
+orchestrator:
+  queue_sizes:
+    fs_events: 1000
+    ebpf_events: 1000
+    yara_events: 1000
+    alerts: 500
+  thresholds:
+    suspicious_file_ops: 50  # File operations per time window to trigger alert
+    encryption_score: 75     # Suspicion score to trigger YARA scan
+    yara_matches_required: 1 # Minimum YARA matches to trigger alert
+  response:
+    default_action: "LOG_ONLY"
+    high_severity_action: "KILL_PROCESS"
+    critical_severity_action: "BLOCK_NETWORK"
+    quarantine_dir: "/var/lib/blockwave/quarantine"
+  correlation:
+    time_window_sec: 60      # Time window for correlation analysis
+    min_events_for_alert: 3  # Minimum events to trigger correlation alert
+  logging:
+    level: "INFO"
+    file: "/var/log/blockwave/orchestrator.log"
+
+# Mitigator Configuration
+mitigator:
+  enabled: true
+  queue_size: 1000
+  quarantine_dir: "/var/lib/blockwave/quarantine"
+  quarantine_mode: 0750      # rwxr-x---
+  sigkill_timeout_sec: 5.0   # Time to wait before SIGKILL
+  max_retry_count: 3         # How many times to retry a failed action
+  retry_delay_sec: 1.0       # Delay between retries
+  audit_log: "/var/log/blockwave/mitigation_audit.log"
+  logging:
+    level: "INFO"
+    file: "/var/log/blockwave/mitigator.log"
+
+# Backup Restore Configuration
+backup_restore:
+  borg_repo: "/path/to/your/borg/repository"
+  passphrase: ""             # Leave empty if no passphrase or use environment variables
+  restore_temp_dir: "/tmp/blockwave/restore"
+  verify_checksums: true     # Verify restored files with checksums
+  hash_algorithm: "sha256"   # Hash algorithm for checksums
+  concurrent_extractions: 4  # Number of concurrent extractions
+  logging:
+    level: "INFO"
+    file: "/var/log/blockwave/backup_restore.log"
+
+# General application settings
+app:
+  name: "BlockWave-Ransom"
+  version: "1.1.0" 

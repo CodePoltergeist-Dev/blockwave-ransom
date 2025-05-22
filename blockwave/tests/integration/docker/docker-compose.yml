@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  backend-test:
+    build:
+      context: ../../..
+      dockerfile: docker/Dockerfile.backend
+      args:
+        - BUILD_ENV=test
+    container_name: test-backend
+    restart: "no"
+    environment:
+      - LOG_LEVEL=DEBUG
+      - QUARANTINE_DIR=/data/quarantine
+      - CONFIG_DIR=/data/config
+      - LOG_DIR=/var/log/blockwave
+      - TEST_MODE=1
+    volumes:
+      - backend-test-logs:/var/log/blockwave
+      - backend-test-quarantine:/data/quarantine
+      - backend-test-config:/data/config
+    ports:
+      - "8000:8000"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  ebpf-test:
+    build:
+      context: ../../..
+      dockerfile: docker/Dockerfile.ebpf
+      args:
+        - BUILD_ENV=test
+    container_name: test-ebpf
+    restart: "no"
+    privileged: true
+    environment:
+      - LOG_LEVEL=DEBUG
+      - EBPF_DATA_DIR=/data/ebpf
+      - LOG_DIR=/var/log/blockwave
+      - BACKEND_URL=http://backend-test:8000
+      - TEST_MODE=1
+    volumes:
+      - ebpf-test-logs:/var/log/blockwave
+      - ebpf-test-data:/data/ebpf
+      - /sys/kernel/debug:/sys/kernel/debug:ro
+      - /lib/modules:/lib/modules:ro
+      - /usr/src:/usr/src:ro
+    ports:
+      - "8001:8001"
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+    networks:
+      - test-network
+    depends_on:
+      backend-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  test-runner:
+    build:
+      context: ../../..
+      dockerfile: tests/integration/docker/Dockerfile.test
+    container_name: test-runner
+    environment:
+      - BACKEND_URL=http://backend-test:8000
+      - EBPF_URL=http://ebpf-test:8001
+      - TEST_TARGET_DIR=/test-data
+    volumes:
+      - ../../..:/app
+      - test-data:/test-data
+    networks:
+      - test-network
+    depends_on:
+      backend-test:
+        condition: service_healthy
+      ebpf-test:
+        condition: service_healthy
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  backend-test-logs:
+  backend-test-quarantine:
+  backend-test-config:
+  ebpf-test-logs:
+  ebpf-test-data:
+  test-data: 

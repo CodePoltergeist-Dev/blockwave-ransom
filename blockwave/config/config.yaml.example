@@ -1,0 +1,150 @@
+# BlockWave-Ransom Configuration File
+
+# Project information
+project:
+  name: "BlockWave-Ransom"
+  version: "1.1.0"
+  description: "Real-time ransomware detection & mitigation on Linux"
+
+# Filesystem monitoring configuration
+fs_monitor:
+  # Directories to watch for file events
+  watch_dirs:
+    - "/home"
+    - "/var/www"
+    - "/etc"
+  
+  # File patterns to ignore (glob syntax)
+  ignore_patterns:
+    - "*.tmp"
+    - "*.swp"
+    - ".git/*"
+    - "node_modules/*"
+    - "*.log"
+    - "*.bak"
+  
+  # Event batching configuration
+  batch:
+    interval_ms: 500  # Batch events every 500 ms
+    max_events: 100   # Maximum events per batch
+  
+  # Performance settings
+  performance:
+    threads: 2        # Number of watcher threads
+    queue_size: 1000  # Maximum queue size
+  
+  # Logging settings
+  logging:
+    level: "INFO"     # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    file: "/var/log/blockwave/fs_monitor.log"
+
+# eBPF monitoring configuration
+ebpf_monitor:
+  enabled: true
+  # Maximum queue size
+  queue_size: 1000
+  # Path to eBPFAngel codebase (defaults to auto-detect)
+  ebpfangel_path: "/path/to/ebpfangel"
+  # eBPFAngel configuration
+  ebpfangel:
+    # Detection thresholds
+    thresholds:
+      open: 50       # File open events
+      create: 25     # File create events
+      delete: 25     # File delete events
+      encrypt: 10    # Encryption function calls
+    # Reset counters every 10 seconds
+    reset_period_sec: 10
+    # Minimum severity to report
+    min_severity: 1  # 0=all, 1=minor, 2=major
+    # Custom patterns (optional)
+    patterns:
+      - bitmap: 0x0000_0012  # Pattern for Open-Create-Delete sequence
+        bitmask: 0x0000_0FFF # Mask for matching the pattern
+      - bitmap: 0x0013_3332  # More complex pattern
+        bitmask: 0x0FFF_FFFF # Mask for matching the pattern
+  # Logging settings
+  logging:
+    level: "INFO"     # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    file: "/var/log/blockwave/ebpf_monitor.log"
+
+# YARA scanner configuration
+yara_scanner:
+  rules_dir: "/etc/blockwave/rules"
+  scan_new_files: true
+  scan_modified_files: true
+  scan_processes: true
+  # Maximum file size to scan
+  max_file_size_mb: 10
+  # Timeout for scanning
+  timeout_sec: 5
+  # Number of scanner threads
+  threads: 4
+
+# Process inspection configuration
+proc_inspector:
+  enabled: true
+  # Sampling frequency
+  sample_interval_sec: 1
+  # Thresholds for alerting
+  thresholds:
+    cpu_percent: 80       # CPU usage threshold
+    cpu_duration_sec: 5   # Duration above threshold
+    memory_mb: 200        # Memory usage threshold
+    unknown_binaries: true # Alert on unknown binaries
+
+# Mitigation configuration
+mitigator:
+  enabled: true
+  # Automatic actions
+  auto_terminate: true    # Terminate suspicious processes
+  auto_quarantine: true   # Move suspicious files to quarantine
+  # Delays before actions
+  termination_delay_sec: 2
+  # Paths
+  quarantine_dir: "/var/lib/blockwave_ransom/quarantine"
+
+# Backup and restore configuration
+backup:
+  enabled: true
+  # Backup engine
+  engine: "borgbackup"
+  # Backup location
+  backup_dir: "/backup/blockwave"
+  # Backup schedule
+  schedule: "hourly"
+  # Retention
+  retention_days: 7
+
+# Logger configuration
+logger:
+  # Database backend settings
+  db_path: "/var/lib/blockwave_ransom/events.db"
+  
+  # Event retention period (in days)
+  retention_days: 30
+  
+  # SQL connection settings
+  max_retries: 3          # Maximum number of connection retries
+  retry_delay_sec: 0.5    # Delay between retry attempts
+  
+  # Schema versioning
+  # Note: This is managed internally by the logger
+  # and should not need manual adjustment
+  
+  # Logging settings for the logger module itself
+  logging:
+    level: "INFO"     # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    file: "/var/log/blockwave/logger.log"
+
+# Legacy logging configuration (deprecated)
+# Use logger section above instead
+logging:
+  backend: "SQLite3"
+  db_path: "/var/lib/blockwave_ransom.sqlite3"
+  table: "events"
+  # Event retention
+  retention_days: 30
+  # Log rotation
+  max_size_mb: 100
+  max_files: 5 

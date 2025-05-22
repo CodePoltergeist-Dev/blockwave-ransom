@@ -1,0 +1,52 @@
+FROM node:18-slim AS builder
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY gui/package.json gui/package-lock.json ./
+RUN npm ci
+
+# Copy source code
+COPY gui/ ./
+
+# Build the Vite application
+RUN npm run build
+
+# Build Electron application
+RUN npm run build:electron
+
+# Second stage: create a lightweight image for running the app
+FROM node:18-slim AS runner
+
+WORKDIR /app
+
+# Copy built application
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/electron ./electron
+COPY --from=builder /app/release ./release
+COPY --from=builder /app/package.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production
+
+# Create configuration directory
+RUN mkdir -p /data/config
+
+# Environment variables
+ENV CONFIG_DIR=/data/config \
+    BACKEND_URL=http://backend:8000 \
+    BACKEND_WS_URL=ws://backend:8000/events/stream \
+    NODE_ENV=production
+
+# Expose the electron app port
+EXPOSE 5173
+
+# Healthcheck (if we're running in development mode with the dev server)
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:5173/ || exit 1
+
+# Entrypoint for development mode
+ENTRYPOINT ["npm", "run"]
+
+# Default command runs in development mode
+CMD ["dev"] 
